@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import shutil
 from docx import Document
 
 # 自然な並び順でソートするためのキー関数
@@ -12,7 +13,11 @@ def extract_text_from_srt(srt_file):
     with open(srt_file, "r", encoding="utf-8") as file:
         content = file.read()
 
-    entries = re.findall(r'\d+\n(\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3})\n(.+?)(?=\n\d+|$)', content, re.DOTALL)
+    entries = re.findall(
+        r'\d+\n(\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3})\n(.+?)(?=\n\d+|$)',
+        content,
+        re.DOTALL
+    )
 
     with_timecodes = ""
     without_timecodes = ""
@@ -27,8 +32,14 @@ def extract_text_from_srt(srt_file):
 def create_docx_for_folder(srt_folder):
     try:
         files = os.listdir(srt_folder)
-        mp4_files = sorted([f for f in files if f.endswith('.mp4')], key=natural_sort_key)
-        srt_files = sorted([f for f in files if f.endswith('.srt')], key=natural_sort_key)
+        mp4_files = sorted(
+            [f for f in files if f.endswith('.mp4')],
+            key=natural_sort_key
+        )
+        srt_files = sorted(
+            [f for f in files if f.endswith('.srt')],
+            key=natural_sort_key
+        )
     except Exception as e:
         print(f"フォルダの読み込みに失敗: {srt_folder}, エラー: {e}")
         return
@@ -50,8 +61,7 @@ def create_docx_for_folder(srt_folder):
         with_time, without_time = extract_text_from_srt(srt_path)
         all_with_timecodes += with_time + "\n\n"
         all_without_timecodes += without_time + "\n"
-        
-        # SRTファイルを削除
+
         os.remove(srt_path)
         print(f"削除完了: {srt_path}")
 
@@ -67,6 +77,16 @@ def create_docx_for_folder(srt_folder):
     print(f"保存完了: {with_time_filename}")
     print(f"保存完了: {without_time_filename}")
 
+    # フォルダをZIP圧縮
+    folder_basename = os.path.basename(srt_folder)
+    zip_base = os.path.join(os.path.dirname(srt_folder), folder_basename)
+    zip_path = shutil.make_archive(zip_base, 'zip', srt_folder)
+    print(f"圧縮完了: {zip_path}")
+
+    # 圧縮後に元フォルダを削除
+    shutil.rmtree(srt_folder)
+    print(f"フォルダ削除完了: {srt_folder}")
+
 def process_multiple_folders(base_folder):
     for root, dirs, files in os.walk(base_folder):
         if any(f.endswith('.srt') for f in files):
@@ -76,6 +96,6 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("使用方法: python3 srt_to_docx.py <フォルダパス>")
         sys.exit(1)
-    
+
     base_folder_path = sys.argv[1]
     process_multiple_folders(base_folder_path)
